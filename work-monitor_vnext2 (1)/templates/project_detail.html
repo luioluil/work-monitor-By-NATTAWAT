@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<nav class="crumb"><a href="{{ url_for('main.projects') }}">โปรเจกต์ของฉัน</a> › <span>{{ project.name }}</span></nav>
+<h1>{{ project.name }}</h1>
+
+<section class="card big" style="margin-bottom:14px">
+  <h3>สร้างงานใหม่</h3>
+  <form method="post" action="{{ url_for('tasks.create_task', project_id=project.id) }}">
+    <div class="row2">
+      <div>
+        <label>ชื่อเรื่องงาน</label>
+        <input class="lg" name="title" placeholder="เช่น ออกแบบหน้า Login" required>
+      </div>
+      <div>
+        <label>ผู้รับผิดชอบ</label>
+        <input class="lg" name="assignee_name" placeholder="เช่น Nattawat">
+      </div>
+    </div>
+    <button class="cta" style="padding:10px 14px" type="submit">สร้างงาน</button>
+  </form>
+</section>
+
+<div class="row">
+  <div class="col">
+    <h3>งานในโปรเจกต์</h3>
+    <ul class="tasks">
+      {% for t in tasks %}
+      <li>
+        <div class="task-header">
+          <span class="t">{{ t.title }}</span>
+          <span class="badge {{ t.status }}">{{ t.status|capitalize }}</span>
+        </div>
+        <div class="barwrap"><div class="barpct" style="width: {{ t.progress_percent }}%"></div></div>
+        <div class="sub">
+          ผู้รับผิดชอบ: {{ t.assignee_name or '—' }} • ความคืบหน้า: {{ t.progress_percent }}% • อัปเดตล่าสุด: {{ t.last_updated }}
+        </div>
+
+        {% if is_manager %}
+        <form class="inline" method="post" action="{{ url_for('tasks.change_status', task_id=t.id) }}" style="margin-top:6px">
+          <select class="lg" name="status">
+            <option value="todo" {{ 'selected' if t.status=='todo' else '' }}>todo</option>
+            <option value="doing" {{ 'selected' if t.status=='doing' else '' }}>doing</option>
+            <option value="done" {{ 'selected' if t.status=='done' else '' }}>done</option>
+            <option value="blocked" {{ 'selected' if t.status=='blocked' else '' }}>blocked</option>
+          </select>
+          <button class="ghost" type="submit">อัปเดตสถานะ</button>
+        </form>
+        <form class="inline" method="post" action="{{ url_for('tasks.change_progress', task_id=t.id) }}" style="margin-top:6px">
+          <input class="lg" type="number" min="0" max="100" name="progress" value="{{ t.progress_percent }}">
+          <button class="ghost" type="submit">อัปเดต %</button>
+        </form>
+        {% else %}
+        <p class="muted" style="margin-top:6px">ปรับสถานะ/เปอร์เซ็นต์ได้โดย owner หรือ BA เท่านั้น</p>
+        {% endif %}
+
+        <div style="margin-top:8px">
+          <a class="cta" style="padding:8px 12px" href="{{ url_for('tasks.task_feed', task_id=t.id) }}">เข้าไป</a>
+        </div>
+      </li>
+      {% else %}
+      <li class="muted">ยังไม่มีงาน — สร้างงานแรกได้จากฟอร์มด้านบน</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="col">
+    <h3>สมาชิก</h3>
+    <table class="tbl">
+      <thead><tr><th>รหัสผู้ใช้</th><th>บทบาท</th></tr></thead>
+      <tbody>
+        {% for m in members %}
+        <tr>
+          <td>{{ m.user_id }}</td>
+          <td>{{ m.role }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted">ลิงก์เชิญ: <a href="{{ invite_link }}">{{ invite_link }}</a></p>
+  </div>
+</div>
+{% endblock %}
