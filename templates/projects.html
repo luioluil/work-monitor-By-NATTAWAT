@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>โปรเจ็กต์ของฉัน</h1>
+
+<div class="bar">
+  <form class="inline" method="post" action="{{ url_for('main.create_project') }}">
+    <input class="lg" name="name" placeholder="ชื่อโปรเจ็กต์ใหม่" required>
+    <button class="cta" style="padding:10px 14px" type="submit">+ New Project</button>
+  </form>
+  <form class="inline" method="post" action="{{ url_for('main.join_project') }}">
+    <input class="lg" name="join_code" placeholder="Join code (เช่น 8X2QF9A1)" required>
+    <button class="ghost" style="padding:10px 14px" type="submit">Join</button>
+  </form>
+</div>
+
+<div class="stats">
+  <span class="chip">ทั้งหมด {{ total }}</span>
+  <span class="chip done">เสร็จแล้ว {{ done }}</span>
+  <span class="chip inprog">กำลังทำ {{ inprog }}</span>
+  <span class="chip blocked">มีปัญหา {{ blocked }}</span>
+</div>
+
+<div class="grid">
+  {% for p in projects %}
+  {% set st = proj_status.get(p.id, 'in_progress') %}
+  <div class="card big">
+    <div class="card-top">
+      <h3 class="title">{{ p.name }}</h3>
+      <span class="badge {{ st }}">{{ 'Done' if st=='done' else 'In-Progress' if st=='in_progress' else 'Blocked' }}</span>
+    </div>
+    <div class="muted">สมาชิก: {{ counts.get(p.id, 0) }}</div>
+    <div class="meta">Join code: <code>{{ p.join_code }}</code></div>
+    <div class="row2" style="align-items:center;gap:8px;margin-top:8px">
+      <a class="cta" style="padding:10px 14px" href="{{ url_for('main.project_detail', project_id=p.id) }}">เข้าไป</a>
+
+      {% set role = roles.get(p.id) %}
+      {% if role == 'owner' %}
+        <form method="post" action="{{ url_for('main.delete_project', project_id=p.id) }}" onsubmit="return confirm('พิมพ์ชื่อโปรเจกต์เพื่อยืนยันลบ: {{ p.name }}')">
+          <button class="danger" type="submit">ลบโปรเจกต์</button>
+        </form>
+      {% else %}
+        <form method="post" action="{{ url_for('main.leave_project', project_id=p.id) }}" onsubmit="return confirm('แน่ใจว่าจะออกจากโปรเจกต์นี้?')">
+          <button class="ghost small" type="submit">ออกจากโปรเจกต์</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <p class="muted">ยังไม่มีโปรเจกต์ — สร้างอันแรกเลย ✨</p>
+  {% endfor %}
+</div>
+{% endblock %}
