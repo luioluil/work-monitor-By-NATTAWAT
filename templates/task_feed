@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block content %}
+<nav class="crumb">
+  <a href="{{ url_for('main.projects') }}">โปรเจกต์ของฉัน</a> ›
+  <a href="{{ url_for('main.project_detail', project_id=task.project_id) }}">โปรเจกต์ {{ task.project_id }}</a> ›
+  <span>{{ task.title }}</span>
+</nav>
+
+<h1>{{ task.title }}</h1>
+
+<section class="card big">
+  <div class="row2">
+    <div>
+      <p class="muted">สถานะ: <span class="badge {{ task.status }}">{{ task.status }}</span></p>
+    </div>
+    <div class="right">
+      {% if is_manager %}
+      <form class="inline" method="post" action="{{ url_for('tasks.change_status', task_id=task.id) }}">
+        <select class="lg" name="status">
+          <option value="todo" {{ 'selected' if task.status=='todo' else '' }}>todo</option>
+          <option value="doing" {{ 'selected' if task.status=='doing' else '' }}>doing</option>
+          <option value="done" {{ 'selected' if task.status=='done' else '' }}>done</option>
+          <option value="blocked" {{ 'selected' if task.status=='blocked' else '' }}>blocked</option>
+        </select>
+        <button class="ghost xl" type="submit">อัปเดตสถานะ</button>
+      </form>
+      <form class="inline" method="post" action="{{ url_for('tasks.change_progress', task_id=task.id) }}">
+        <input class="lg" type="number" min="0" max="100" name="progress" value="{{ task.progress_percent }}">
+        <button class="ghost xl" type="submit">อัปเดต %</button>
+      </form>
+      {% else %}
+      <p class="muted">ความคืบหน้า: {{ task.progress_percent }}% • (แก้ไขได้โดย owner/ba)</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="card big">
+  <h3>โพสต์อัปเดตใหม่</h3>
+  <form method="post" action="{{ url_for('tasks.create_update', task_id=task.id) }}">
+    <label>รายละเอียดอัปเดต</label>
+    <textarea class="lg" name="content" rows="3" required placeholder="เขียนว่าทำอะไรคืบหน้าไปบ้าง..."></textarea>
+
+    {% if is_manager %}
+    <div class="row2">
+      <div>
+        <label>ความคืบหน้า (%)</label>
+        <input class="lg" type="number" name="progress_percent" min="0" max="100" placeholder="0-100">
+      </div>
+      <div>
+        <label>สถานะ</label>
+        <select class="lg" name="status">
+          <option value="">(ไม่เปลี่ยน)</option>
+          <option value="todo">todo</option>
+          <option value="doing">doing</option>
+          <option value="done">done</option>
+          <option value="blocked">blocked</option>
+        </select>
+      </div>
+    </div>
+    {% endif %}
+
+    <label>แนบลิงก์ (หนึ่งบรรทัดต่อ 1 ลิงก์)</label>
+    <!-- เพิ่ม id เพื่อให้ JS เติมลิงก์อัตโนมัติได้ -->
+    <textarea id="links_input" class="lg" name="links" rows="2"
+      placeholder="https://github.com/...&#10;https://figma.com/..."></textarea>
+
+    <p class="muted">แนบไฟล์ด้านล่าง — รองรับ png, jpg/jpeg, pdf, docx, xlsx ≤ 10MB/ไฟล์</p>
+    <button class="cta xl" type="submit">โพสต์อัปเดต</button>
+  </form>
+</section>
+
+<section class="card big">
+  <h3>แนบไฟล์ให้ Task นี้</h3>
+  {% if not cloudinary_cloud_name or not cloudinary_upload_preset %}
+    <p class="muted">ยังไม่ได้ตั้งค่า Cloudinary CLOUD_NAME / UPLOAD_PRESET ใน ENV</p>
+  {% endif %}
+
+  <div class="row2">
+    <input class="lg" id="fileInput" type="file" multiple
+      accept=".png,.jpg,.jpeg,.pdf,.docx,.xlsx">
+    <button class="ghost xl" type="button" id="btnUpload">อัปโหลด</button>
+  </div>
+
+  <div id="uploadStatus" class="muted" style="margin-top:8px;">ยังไม่ได้อัปโหลด…</div>
+
+  <ul id="uploadedList" class="files" style="margin-top:.5rem;"></ul>
+
+  <hr style="margin:1rem 0">
+
+  <ul class="files">
+    {% for f in files %}
+    <li>
+      <a href="{{ f.secure_url }}" target="_blank">{{ f.file_name }}</a>
+      <span class="muted">• {{ f.content_type or '?' }} • {{ f.size_bytes or 0 }} bytes</span>
+      <form method="post" action="{{ url_for('tasks.delete_file', task_id=task.id, file_id=f.id) }}" style="display:inline">
+        <button class="danger small" type="submit">ลบ</button>
+      </form>
+    </li>
+    {% else %}
+    <li class="muted">ยังไม่มีไฟล์แนบ</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card big">
+  <h3>ไทม์ไลน์อัปเดต (ล่าสุดอยู่บน)</h3>
+  <ul class="updates">
+    {% for u in updates %}
+    <li class="update-card">
+      <div class="up-top">
+        {% if u.status %}<span class="badge {{ u.status }}">{{ u.status }}</span>{% endif %}
+        {% if u.progress_percent is not none %}<span class="chip">Progress: {{ u.progress_percent }}%</span>{% endif %}
+        <span class="muted right">{{ u.created_at }}</span>
+      </div>
+      <div class="up-content">{{ u.content }}</div>
+
+      {% set links = links_map.get(u.id, []) %}
+      {% if links %}
+      <div class="links">
+        {% for l in links %}
+          <a class="link-pill" href="{{ l.url }}" target="_blank">{{ l.url }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <a class="ghost small" href="{{ url_for('tasks.update_detail', update_id=u.id) }}">ดูรายละเอียด</a>
+    </li>
+    {% else %}
+    <li class="muted">ยังไม่มีโพสต์อัปเดต</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<script>
+(() => {
+  const CLOUD_NAME    = "{{ cloudinary_cloud_name or '' }}";
+  const UPLOAD_PRESET = "{{ cloudinary_upload_preset or '' }}";
+  const REGISTER_URL  = "{{ url_for('tasks.register_uploaded_file', task_id=task.id) }}";
+
+  const fileInput  = document.getElementById('fileInput');
+  const btnUpload  = document.getElementById('btnUpload');
+  const statusBox  = document.getElementById('uploadStatus');
+  const listBox    = document.getElementById('uploadedList');
+  const linksInput = document.getElementById('links_input');
+
+  function appendLink(url) {
+    if (!linksInput) return;
+    linksInput.value += (linksInput.value.trim() ? "\n" : "") + url;
+  }
+  function addListItem(url, name) {
+    const li = document.createElement('li');
+    li.innerHTML = `<a href="${url}" target="_blank">${name || url}</a>`;
+    listBox.appendChild(li);
+  }
+
+  async function uploadOne(file) {
+    const endpoint = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`;
+    const form = new FormData();
+    form.append('file', file);
+    form.append('upload_preset', UPLOAD_PRESET);
+    const res = await fetch(endpoint, { method: 'POST', body: form });
+    const js  = await res.json();
+    if (!res.ok || !js.secure_url) {
+      const msg = (js.error && js.error.message) || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return js;
+  }
+
+  async function registerToServer(file, cldJson) {
+    const fd = new FormData();
+    fd.append('file_name', file.name);
+    fd.append('content_type', file.type || '');
+    fd.append('size_bytes', file.size.toString());
+    fd.append('public_id', cldJson.public_id || '');
+    fd.append('secure_url', cldJson.secure_url);
+    const r = await fetch(REGISTER_URL, { method: 'POST', body: fd });
+    if (!r.ok) {
+      const t = await r.text();
+      console.warn('register failed', t);
+    }
+  }
+
+  btnUpload.addEventListener('click', async () => {
+    if (!CLOUD_NAME || !UPLOAD_PRESET) { alert('ยังไม่ได้ตั้งค่า Cloudinary'); return; }
+    const files = fileInput.files;
+    if (!files || !files.length) { alert('เลือกไฟล์ก่อน'); return; }
+
+    const okExt = /\.(png|jpg|jpeg|pdf|docx|xlsx)$/i;
+    for (const f of files) {
+      if (!okExt.test(f.name))      { alert(`ไฟล์ไม่รองรับ: ${f.name}`); return; }
+      if (f.size > 10*1024*1024)    { alert(`ไฟล์ใหญ่เกิน 10MB: ${f.name}`); return; }
+    }
+
+    btnUpload.disabled = true;
+    statusBox.textContent = 'กำลังอัปโหลด…';
+
+    for (const f of files) {
+      try {
+        const cld = await uploadOne(f);
+        // เติมลิงก์เข้า textarea อัตโนมัติ + แสดงรายการบนหน้า
+        appendLink(cld.secure_url);
+        addListItem(cld.secure_url, f.name);
+        // ลงทะเบียนไฟล์เข้า DB
+        await registerToServer(f, cld);
+      } catch (e) {
+        console.error(e);
+        alert(`อัปโหลด ${f.name} ไม่สำเร็จ: ${e.message}`);
+      }
+    }
+
+    statusBox.textContent = 'อัปโหลดเสร็จ ✓ (ลิงก์ถูกเติมในช่องแนบลิงก์แล้ว)';
+    btnUpload.disabled = false;
+    fileInput.value = '';
+  });
+})();
+</script>
+{% endblock %}
